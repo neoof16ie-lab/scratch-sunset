@@ -1,26 +1,34 @@
-name: リクエスト送信フォーム
-description: 実行したい処理のリクエストをここから送信してください。
-title: "[Request]: "
-labels: ["user-request"] # Actionsが検知するための目印タグ
-body:
-  - type: markdown
-    attributes:
-      value: |
-        ### リクエストフォームへようこそ！
-        以下の項目を入力して「Submit new issue」を押すと、自動で処理が開始されます。
-  - type: input
-    id: request_data
-    attributes:
-      label: 処理したいデータ（文字やURLなど）
-      placeholder: ここに入力してください
-    validations:
-      required: true
-  - type: dropdown
-    id: option_type
-    attributes:
-      label: 実行オプション
-      options:
-        - 通常処理
-        - 高度な処理
-    validations:
-      required: true
+name: Realtime Scratch Respond System (Via Render)
+
+on:
+  repository_dispatch:
+    types: [scratch_request]
+
+jobs:
+  calculate-sun:
+    runs-on: ubuntu-latest
+    steps:
+      - name: コードをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Pythonのセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 必要なライブラリを確実にインストール
+        # 💡 scratchattach が見つからないエラーを防ぐため、確実に最新版をインストールさせます
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests scratchattach
+
+      - name: 世界対応版Pythonスクリプトを実行してScratchを更新
+        env:
+          # 🔒 先ほど秘密金庫に登録したScratchのログイン情報がここでカチッと読み込まれます！
+          SCRATCH_USERNAME: ${{ secrets.SCRATCH_USERNAME }}
+          SCRATCH_PASSWORD: ${{ secrets.SCRATCH_PASSWORD }}
+          
+          # Renderから送られてきた緯度・経度
+          LATITUDE: ${{ github.event.client_payload.lat }}
+          LONGITUDE: ${{ github.event.client_payload.lng }}
+        run: python process_issue.py
