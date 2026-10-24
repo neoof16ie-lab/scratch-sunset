@@ -49,7 +49,8 @@ def trigger_actions():
     if not GITHUB_TOKEN or not GITHUB_REPO:
         return jsonify({"status": "error", "message": "Server configuration (TOKEN or REPO) is missing from Render"}), 500
 
-    github_url = f"https://github.com{GITHUB_REPO}/dispatches"
+    # ⭕ 今度こそ本当に完全に修正しました！頭が api.github.com になっています！
+    github_url = f"https://api.github.com/repos/{GITHUB_REPO}/dispatches"
     
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
@@ -67,7 +68,6 @@ def trigger_actions():
     try:
         response = requests.post(github_url, json=payload, headers=headers)
         
-        # 💡 文字が消えてしまう原因だった 'in' を使わず、シンプルな比較に変更しました
         # ステータスコードが200から299の間（成功）であればOKと判定します
         if 200 <= response.status_code < 300:
             return jsonify({"status": "success", "message": "Actions triggered successfully"}), 200
