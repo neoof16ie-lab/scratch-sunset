@@ -20,7 +20,7 @@ def main():
         print(f"エラー: 座標変換失敗: {e}")
         sys.exit(1)
 
-    api_url = f"https://sunrise-sunset.org{lat}&lng={lng}&formatted=0"
+    api_url = f"https://sunrise-sunset.org/lat={lat}&lng={lng}&formatted=0"
     
     try:
         response = requests.get(api_url)
