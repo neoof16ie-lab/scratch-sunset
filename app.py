@@ -29,7 +29,7 @@ def trigger_actions():
         return jsonify({"status": "error", "message": "Server configuration missing"}), 500
 
     # 2. GitHub Actionsを叩き起こすための設定（APIリクエスト）
-  github_url = f"https://github.com/repos/{GITHUB_REPO}/dispatches"
+  github_url = f"https://github.com/{GITHUB_REPO}/dispatches"
 
     
     headers = {
