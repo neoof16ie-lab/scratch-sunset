@@ -27,12 +27,8 @@ def trigger_actions():
 
     if not GITHUB_TOKEN or not GITHUB_REPO:
         return jsonify({"status": "error", "message": "Server configuration missing"}), 500
-
-    # 2. GitHub Actionsを叩き起こすための設定（APIリクエスト）
+ # 2. GitHub Actionsを叩き起こすための設定（APIリクエスト）
         github_url = f"https://api.github.com/repos/{GITHUB_REPO}/dispatches"
-
-
-    
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json"
