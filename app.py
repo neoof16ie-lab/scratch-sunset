@@ -67,4 +67,4 @@ except Exception as e:
 return jsonify({"status": "error", "message": f"Failed to connect to GitHub: {str(e)}"}), 500
 if name == 'main':
 port = int(os.environ.get("PORT", 5000))
-app.run(host='0.0.0.0', port=port)try:
+app.run(host='0.0.0.0', port=port)
