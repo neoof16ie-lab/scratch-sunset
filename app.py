@@ -3,7 +3,7 @@ import requests
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
-
+CORS(app)
 # Renderの環境変数（Environment Variables）から設定を読み込む
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_REPO = os.environ.get("GITHUB_REPO")  # 例: "ユーザー名/リポジトリ名"
