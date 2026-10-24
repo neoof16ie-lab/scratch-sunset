@@ -1,81 +1,91 @@
 import os
-import json
+import sys
 import requests
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+import scratchattach as scratch
 
-app = Flask(__name__)
-CORS(app)
-
-@app.route('/trigger', methods=['GET', 'POST'])
-def trigger_actions():
-    GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
-    GITHUB_REPO = os.environ.get("GITHUB_REPO")
+def main():
+    lat_str = os.environ.get("LATITUDE")
+    lng_str = os.environ.get("LONGITUDE")
     
-    lat = None
-    lng = None
+    print(f"Actions受信 - 緯度: {lat_str}, 経度: {lng_str}")
 
-    if request.method == 'POST':
-        # text/plain で送られてきた生のテキストデータを取得します
-        raw_text = request.data.decode('utf-8') if request.data else ""
-        print(f"Render受信(生のテキスト): {raw_text}")
-        
-        if raw_text:
-            try:
-                # 文字列をJSONとして解析（デコード）します
-                data = json.loads(raw_text)
-                lat = data.get("lat")
-                lng = data.get("lng")
-            except Exception as e:
-                print(f"JSONパースエラー: {e}")
-                
-        # もしテキスト形式で解析できなかった場合は、従来のフォーム形式等からも探します
-        if not lat or not lng:
-            try:
-                data = request.get_json(silent=True) or request.form or {}
-                lat = data.get("lat")
-                lng = data.get("lng")
-            except Exception:
-                pass
-    else:
-        lat = request.args.get("lat")
-        lng = request.args.get("lng")
-
-    print(f"Render解析結果 - 緯度: {lat}, 経度: {lng}")
-
-    if not lat or not lng:
-        return jsonify({"status": "error", "message": "lat or lng is missing"}), 400
-
-    if not GITHUB_TOKEN or not GITHUB_REPO:
-        return jsonify({"status": "error", "message": "Server configuration (TOKEN or REPO) is missing from Render"}), 500
-
-    # ⭕ 今度こそ本当に完全に修正しました！頭が api.github.com になっています！
-    github_url = f"https://api.github.com/repos/{GITHUB_REPO}/dispatches"
-    
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    
-    payload = {
-        "event_type": "scratch_request",
-        "client_payload": {
-            "lat": str(lat),
-            "lng": str(lng)
-        }
-    }
+    if not lat_str or not lng_str:
+        print("エラー: 緯度・経度が不足しています。")
+        sys.exit(1)
 
     try:
-        response = requests.post(github_url, json=payload, headers=headers)
-        
-        # ステータスコードが200から299の間（成功）であればOKと判定します
-        if 200 <= response.status_code < 300:
-            return jsonify({"status": "success", "message": "Actions triggered successfully"}), 200
-        else:
-            return jsonify({"status": "error", "message": f"GitHub API rejected with status: {response.status_code}", "detail": response.text}), 400
+        lat = float(lat_str)
+        lng = float(lng_str)
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Failed to connect to GitHub: {str(e)}"}), 500
+        print(f"エラー: 座標変換失敗: {e}")
+        sys.exit(1)
 
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    # formatted=0 で現地時間のタイムゾーン付きISO 8601形式を取得します
+    api_url = f"https://sunrise-sunset.org{lat}&lng={lng}&formatted=0"
+    
+    try:
+        response = requests.get(api_url)
+        res_data = response.json()
+        
+        if res_data.get("status") != "OK":
+            print(f"APIエラー: {res_data.get('status')}")
+            sys.exit(1)
+            
+        results = res_data["results"]
+        
+        # 💡 現地時間の「時:分」をそのまま安全に抜き出す関数（4桁の文字列にする）
+        def to_local_digits(utc_iso_str):
+            time_part = utc_iso_str.split("T")[-1][:5] # "05:54"
+            return time_part.replace(":", "") # "0554"
+
+        # 💡 タイムゾーン情報を数字5桁にエンコードする関数
+        # 例: "+09:00" -> プラスなので頭に「1」をつけて "10900"
+        # 例: "-05:00" -> マイナスなので頭に「2」をつけて "20500"
+        def encode_timezone(utc_iso_str):
+            try:
+                # 文字列の後ろからタイムゾーン部分（例: "+09:00" や "-05:00"）を抜き出す
+                tz_part = utc_iso_str[-6:] # "+09:00"
+                sign_char = tz_part[0] # "+" または "-"
+                tz_time = tz_part[1:].replace(":", "") # "0900"
+                
+                sign_num = "1" if sign_char == "+" else "2"
+                return f"{sign_num}{tz_time}"
+            except Exception:
+                # 万が一解析できない場合は、デフォルトとして時差なし「10000」を返す安全装置
+                return "10000"
+
+        # 1. 各時刻を現地時間の4桁の数字に変換（計32桁分）
+        sunrise     = to_local_digits(results["sunrise"])
+        sunset      = to_local_digits(results["sunset"])
+        civil_s     = to_local_digits(results["civil_twilight_begin"])
+        civil_e     = to_local_digits(results["civil_twilight_end"])
+        nautical_s  = to_local_digits(results["nautical_twilight_begin"])
+        nautical_e  = to_local_digits(results["nautical_twilight_end"])
+        astro_s     = to_local_digits(results["astronomical_twilight_begin"])
+        astro_e     = to_local_digits(results["astronomical_twilight_end"])
+
+        # 2. タイムゾーン（時差）を5桁の数字に変形（「sunrise」から代表して取得）
+        tz_encoded  = encode_timezone(results["sunrise"])
+
+        # 3. すべてをガッチャンコして、合計37桁の巨大な数字の列を完成させる
+        encoded_data = sunrise + sunset + civil_s + civil_e + nautical_s + nautical_e + astro_s + astro_e + tz_encoded
+        print(f"作成した37桁のデータ (現地時間 + 時差): {encoded_data}")
+
+        # 4. GitHub環境変数からScratchのログイン情報を読み込み
+        username = os.environ["SCRATCH_USERNAME"]
+        password = os.environ["SCRATCH_PASSWORD"]
+        project_id = "あなたのScratchプロジェクトID"  # ※ここだけご自身の作品ID（数字）に変えてください
+
+        # 5. Scratchのクラウド変数に送信
+        session = scratch.login(username, password)
+        conn = session.connect_cloud(project_id)
+        conn.set_var("response", int(encoded_data))
+        conn.set_var("status", 1)
+        print("Scratchへの37桁送信が正常に完了しました！")
+
+    except Exception as e:
+        print(f"処理中にエラーが発生しました: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
