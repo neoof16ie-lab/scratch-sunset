@@ -66,8 +66,10 @@ def trigger_actions():
 
     try:
         response = requests.post(github_url, json=payload, headers=headers)
-        # ⭕ 途切れていた文法を「200, 201, 202, 204」を正しく判定する形に修正しました
-        if response.status_code in:
+        
+        # 💡 文字が消えてしまう原因だった 'in' を使わず、シンプルな比較に変更しました
+        # ステータスコードが200から299の間（成功）であればOKと判定します
+        if 200 <= response.status_code < 300:
             return jsonify({"status": "success", "message": "Actions triggered successfully"}), 200
         else:
             return jsonify({"status": "error", "message": f"GitHub API rejected with status: {response.status_code}", "detail": response.text}), 400
