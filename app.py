@@ -1,40 +1,61 @@
 import os
+import json
 import requests
 from flask import Flask, request, jsonify
-from flask_cors import CORS 
+from flask_cors import CORS
+
 app = Flask(__name__)
 CORS(app)
-# Renderの環境変数（Environment Variables）から設定を読み込む
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
-GITHUB_REPO = os.environ.get("GITHUB_REPO")  # 例: "ユーザー名/リポジトリ名"
 
 @app.route('/trigger', methods=['GET', 'POST'])
 def trigger_actions():
-    # 1. Scratchやユーザーから送られてきた緯度・経度を取得
-    # GET通信（URLパラメータ）とPOST通信の両方に対応させます
+    GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+    GITHUB_REPO = os.environ.get("GITHUB_REPO")
+    
+    lat = None
+    lng = None
+
     if request.method == 'POST':
-        data = request.get_json() or {}
-        lat = data.get("lat")
-        lng = data.get("lng")
+        # 💡 text/plain で送られてきた生のテキストデータを取得します
+        raw_text = request.data.decode('utf-8') if request.data else ""
+        print(f"Render受信(生のテキスト): {raw_text}")
+        
+        if raw_text:
+            try:
+                # 文字列をJSONとして解析（デコード）します
+                data = json.loads(raw_text)
+                lat = data.get("lat")
+                lng = data.get("lng")
+            except Exception as e:
+                print(f"JSONパースエラー: {e}")
+                
+        # もしテキスト形式で解析できなかった場合は、従来のフォーム形式等からも探します
+        if not lat or not lng:
+            try:
+                data = request.get_json(silent=True) or request.form or {}
+                lat = data.get("lat")
+                lng = data.get("lng")
+            except Exception:
+                pass
     else:
         lat = request.args.get("lat")
         lng = request.args.get("lng")
 
-    print(f"Renderがリクエストを受信 - 緯度: {lat}, 経度: {lng}")
+    print(f"Render解析結果 - 緯度: {lat}, 経度: {lng}")
 
     if not lat or not lng:
         return jsonify({"status": "error", "message": "lat or lng is missing"}), 400
 
     if not GITHUB_TOKEN or not GITHUB_REPO:
-        return jsonify({"status": "error", "message": "Server configuration missing"}), 500
- # 2. GitHub Actionsを叩き起こすための設定（APIリクエスト）
-        github_url = f"https://api.github.com/repos/{GITHUB_REPO}/dispatches"
+        return jsonify({"status": "error", "message": "Server configuration (TOKEN or REPO) is missing from Render"}), 500
+
+    github_url = f"https://github.com{GITHUB_REPO}/dispatches"
+    
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json"
     }
     
-    # 先ほど作成したymlの「types: [scratch_request]」と連動させます
     payload = {
         "event_type": "scratch_request",
         "client_payload": {
@@ -43,21 +64,15 @@ def trigger_actions():
         }
     }
 
-    # 3. GitHubへPOST送信してActionsを起動（キック）する
     try:
         response = requests.post(github_url, json=payload, headers=headers)
-        if response.status_code == 24: # 204 No Content が成功の合図です
-            print("GitHub Actionsの起動に成功しました！")
-            return jsonify({"status": "success", "message": "Actions triggered"}), 200
+        if response.status_code in:
+            return jsonify({"status": "success", "message": "Actions triggered successfully"}), 200
         else:
-            print(f"GitHubエラー: {response.status_code} - {response.text}")
-            return jsonify({"status": "error", "message": "Failed to trigger GitHub"}), response.status_code
-            
+            return jsonify({"status": "error", "message": f"GitHub API rejected with status: {response.status_code}", "detail": response.text}), 400
     except Exception as e:
-        print(f"通信エラー: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": f"Failed to connect to GitHub: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    # Renderが指定するポート番号で起動させる設定
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
