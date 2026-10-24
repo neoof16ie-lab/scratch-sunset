@@ -57,14 +57,14 @@ def trigger_actions():
             "lng": str(lng)
         }
     }
-try:
-response = requests.post(github_url, json=payload, headers=headers)
-if 200 <= response.status_code < 300:
-return jsonify({"status": "success", "message": "Actions triggered successfully"}), 200
-else:
-return jsonify({"status": "error", "message": f"GitHub API rejected with status: {response.status_code}", "detail": response.text}), 400
-except Exception as e:
-return jsonify({"status": "error", "message": f"Failed to connect to GitHub: {str(e)}"}), 500
-if name == 'main':
-port = int(os.environ.get("PORT", 5000))
-app.run(host='0.0.0.0', port=port)
+    try:
+        response = requests.post(github_url, json=payload, headers=headers)
+        if 200 <= response.status_code < 300:
+            return jsonify({"status": "success", "message": "Actions triggered successfully"}), 200
+        else:
+            return jsonify({"status": "error", "message": f"GitHub API rejected with status: {response.status_code}", "detail": response.text}), 400
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed to connect to GitHub: {str(e)}"}), 500
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
