@@ -1,0 +1,33 @@
+name: Realtime Scratch Respond System (Via Render)
+
+on:
+  # Render（外部サーバー）からの「repository_dispatch」イベントを受け取って即時起動する設定
+  repository_dispatch:
+    types: [scratch_request]
+
+jobs:
+  calculate-sun:
+    runs-on: ubuntu-latest
+    steps:
+      - name: コードをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Pythonのセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 必要なライブラリをインストール
+        run: |
+          pip install requests scratchattach
+
+      - name: 世界対応版Pythonスクリプトを実行してScratchを更新
+        env:
+          # GitHubの「Settings -> Secrets and variables -> Actions」に登録したScratchのログイン情報
+          SCRATCH_USERNAME: ${{ secrets.SCRATCH_USERNAME }}
+          SCRATCH_PASSWORD: ${{ secrets.SCRATCH_PASSWORD }}
+          
+          # Renderから送られてきたリクエストデータ（緯度・経度）をPython環境変数に渡す
+          LATITUDE: ${{ github.event.client_payload.lat }}
+          LONGITUDE: ${{ github.event.client_payload.lng }}
+        run: python process-issue.py
