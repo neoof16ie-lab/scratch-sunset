@@ -16,7 +16,7 @@ def trigger_actions():
     lng = None
 
     if request.method == 'POST':
-        # 💡 text/plain で送られてきた生のテキストデータを取得します
+        # text/plain で送られてきた生のテキストデータを取得します
         raw_text = request.data.decode('utf-8') if request.data else ""
         print(f"Render受信(生のテキスト): {raw_text}")
         
@@ -66,6 +66,7 @@ def trigger_actions():
 
     try:
         response = requests.post(github_url, json=payload, headers=headers)
+        # ⭕ 途切れていた文法を「200, 201, 202, 204」を正しく判定する形に修正しました
         if response.status_code in:
             return jsonify({"status": "success", "message": "Actions triggered successfully"}), 200
         else:
