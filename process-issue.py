@@ -7,7 +7,7 @@ def main():
     lat_str = os.environ.get("LATITUDE")
     lng_str = os.environ.get("LONGITUDE")
     
-    print(f"Actions起動成功 - 緯度: {lat_str}, 経度: {lng_str}")
+    print(f"Actions起動成功(秒対応) - 緯度: {lat_str}, 経度: {lng_str}")
 
     if not lat_str or not lng_str:
         print("エラー: 緯度・経度が届いていません。")
@@ -20,7 +20,7 @@ def main():
         print(f"エラー: 座標変換失敗: {e}")
         sys.exit(1)
 
-    api_url = f"https://sunrise-sunset.org/lat={lat}&lng={lng}&formatted=0"
+    api_url = f"https://sunrise-sunset.org{lat}&lng={lng}&formatted=0"
     
     try:
         response = requests.get(api_url)
@@ -31,17 +31,17 @@ def main():
             sys.exit(1)
             
         results = res_data["results"]
-        # 💡 null（None）を安全に回避し、白夜・極夜なら「9999」を返す関数
+        # 💡 秒（6桁）まで安全に切り出すようにプログラムを拡張しました！
         def to_local_digits(utc_iso_str):
             if utc_iso_str is None:
-                return "9999"
+                return "999999"  # 秒まで含めてデータがない時は9が6つ
             try:
-                time_part = utc_iso_str.split("T")[-1][:5]
-                return time_part.replace(":", "")
+                # "05:54:23" のように「秒」までをそのまま抜き出します
+                time_part = utc_iso_str.split("T")[-1][:8]
+                return time_part.replace(":", "")  # "055423" になります
             except Exception:
-                return "9999"
+                return "999999"
 
-        # 💡 タイムゾーン（時差）を5桁の数字にする関数
         def encode_timezone(utc_iso_str):
             if utc_iso_str is None:
                 return "10000"
@@ -53,34 +53,42 @@ def main():
                 return f"{sign_num}{tz_time}"
             except Exception:
                 return "10000"
-
-        # 💡 白夜（1）か極夜（2）か通常（0）かを見分けるサインを作る（38文字目用）
         day_length = results.get("day_length", -1)
-        polar_status = "0"  # 通常
+        polar_status = "0"
         if results.get("sunrise") is None or results.get("sunset") is None:
             if day_length == 0:
-                polar_status = "2"  # 極夜（昼が0秒）
+                polar_status = "2"  # 極夜
             else:
-                polar_status = "1"  # 白夜（それ以外・昼が24時間）
+                polar_status = "1"  # 白夜
 
-        # 各時刻の変換（32桁分）と時差の変換（5桁分）、送信処理
-        # （完全なコード詳細はプロンプト内の提供元コードをご参照ください）
-        encoded_data = ... # 38桁のデータを結合
-        
-        # Scratchへのログインと送信
+        # 6桁×8種類（48桁）＋時差（5桁）＋極地サイン（1桁）＝合計54桁にします
+        sunrise     = to_local_digits(results["sunrise"])
+        sunset      = to_local_digits(results["sunset"])
+        civil_s     = to_local_digits(results["civil_twilight_begin"])
+        civil_e     = to_local_digits(results["civil_twilight_end"])
+        nautical_s  = to_local_digits(results["nautical_twilight_begin"])
+        nautical_e  = to_local_digits(results["nautical_twilight_end"])
+        astro_s     = to_local_digits(results["astronomical_twilight_begin"])
+        astro_e     = to_local_digits(results["astronomical_twilight_end"])
+        tz_encoded  = encode_timezone(results["sunrise"])
+
+        encoded_data = sunrise + sunset + civil_s + civil_e + nautical_s + nautical_e + astro_s + astro_e + tz_encoded + polar_status
+        print(f"Scratch送信データ(54桁): {encoded_data}")
+        # 🔒 秘密金庫（Secrets）からログイン情報を安全に引っ張ってきます
         username = os.environ.get("SCRATCH_USERNAME")
         password = os.environ.get("SCRATCH_PASSWORD")
-        project_id = "あなたのScratchプロジェクトID"  # ※ご自身の作品ID（数字）に変更
+        project_id = "あなたのScratchプロジェクトID"  # ※ここをご自身の作品ID（数字）に変えてください
 
         if not username or not password:
-            print("エラー: GitHubのSecretsにログイン情報がありません。")
+            print("エラー: GitHubのSecretsにログイン情報が登録されていません。")
             sys.exit(1)
 
+        # 本家Scratchにログインして54桁のデータを変数に流し込みます
         session = scratch.login(username, password)
         conn = session.connect_cloud(project_id)
         conn.set_var("response", int(encoded_data))
         conn.set_var("status", 1)
-        print("本家Scratchのクラウド変数への同期が完全に成功しました！")
+        print("本家Scratchのクラウド変数への54桁同期が完全に成功しました！")
 
     except Exception as e:
         print(f"処理中にクラッシュしました: {e}")
