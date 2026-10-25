@@ -77,7 +77,7 @@ def main():
         # 🔒 秘密金庫（Secrets）からログイン情報を安全に引っ張ってきます
         username = os.environ.get("SCRATCH_USERNAME")
         password = os.environ.get("SCRATCH_PASSWORD")
-        project_id = "あなたのScratchプロジェクトID"  # ※ここをご自身の作品ID（数字）に変えてください
+        project_id = "1368627969"  # ※ここをご自身の作品ID（数字）に変えてください
 
         if not username or not password:
             print("エラー: GitHubのSecretsにログイン情報が登録されていません。")
