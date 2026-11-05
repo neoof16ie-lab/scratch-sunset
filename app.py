@@ -11,6 +11,7 @@ CORS(app)
 def trigger_actions():
     GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
     GITHUB_REPO = os.environ.get("GITHUB_REPO")
+    GITHUB_USER = os.environ.get("GITHUB_USER")
     
     lat = None
     lng = None
@@ -43,7 +44,7 @@ def trigger_actions():
 
     if not GITHUB_TOKEN or not GITHUB_REPO:
         return jsonify({"status": "error", "message": "Server configuration missing from Render"}), 500
-    github_url = f"https://api.github.com/repos/{GITHUB_REPO}/dispatches"
+    github_url = f"https://api.github.com/repos/{GITHUB_USER}{GITHUB_REPO}/dispatches"
     
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
