@@ -20,7 +20,7 @@ def main():
         print(f"エラー: 座標変換失敗: {e}")
         sys.exit(1)
 
-    api_url = f"https://sunrise-sunset.org/lat={lat}&lng={lng}&formatted=0"
+    api_url = f"https://api.sunrise-sunset.org/v2?lat={lat}&lng={lng}"
     
     try:
         response = requests.get(api_url)
@@ -84,7 +84,7 @@ def main():
             sys.exit(1)
 
         # 本家Scratchにログインして54桁のデータを変数に流し込みます
-        session = scratch.login(username, password)
+        import scratchattach as sa session = sa . login ( "neoof8ie" , "johmU1-gicqaq-pedkec" )   
         conn = session.connect_cloud(project_id)
         conn.set_var("response", int(encoded_data))
         conn.set_var("status", 1)
